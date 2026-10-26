@@ -12,3 +12,49 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+model Post {
+  id      Int       @id @default(autoincrement())
+  title   String
+  text    String
+  likes   User[]
+  userId  Int
+  Comment Comment[]
+  created DateTime
+  edited  DateTime?
+}
+
+model User {
+  id                 Int             @id @default(autoincrement())
+  email              String          @unique
+  name               String
+  profileImageUrl    String?
+  password           String
+  Comment            Comment[]
+  following          User[]          @relation("FollowingUsers")
+  followers          User[]          @relation("FollowingUsers")
+  Post               Post[]
+  followRequests     FollowRequest[] @relation("FollowRequests")
+  sentFollowRequests FollowRequest[] @relation("SentRequest")
+}
+
+model Comment {
+  id              Int       @id @default(autoincrement())
+  text            String
+  Post            Post?     @relation(fields: [postId], references: [id])
+  postId          Int?
+  userId          Int
+  User            User      @relation(fields: [userId], references: [id])
+  edited          DateTime?
+  parentCommentId Int?
+  parentComment   Comment?  @relation("commentSubComments", fields: [parentCommentId], references: [id])
+  subComments     Comment[] @relation("commentSubComments")
+}
+
+model FollowRequest {
+  id         Int  @id @default(autoincrement())
+  receiver   User @relation("FollowRequests", fields: [receiverId], references: [id])
+  sender     User @relation("SentRequest", fields: [senderId], references: [id])
+  receiverId Int
+  senderId   Int
+}
