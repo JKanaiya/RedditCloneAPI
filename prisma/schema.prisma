@@ -14,14 +14,16 @@ datasource db {
 }
 
 model Post {
-  id      Int       @id @default(autoincrement())
-  title   String
-  text    String
-  likes   User[]
-  userId  Int
-  Comment Comment[]
-  created DateTime
-  edited  DateTime?
+  id          Int        @id @default(autoincrement())
+  title       String
+  text        String
+  likes       User[]
+  userId      Int
+  Comment     Comment[]
+  created     DateTime
+  edited      DateTime?
+  subReddit   SubReddit? @relation(fields: [subRedditId], references: [id])
+  subRedditId Int?
 }
 
 model User {
@@ -36,6 +38,7 @@ model User {
   Post               Post[]
   followRequests     FollowRequest[] @relation("FollowRequests")
   sentFollowRequests FollowRequest[] @relation("SentRequest")
+  subReddits         SubReddit[]     @relation("subreddits")
 }
 
 model Comment {
@@ -57,4 +60,10 @@ model FollowRequest {
   sender     User @relation("SentRequest", fields: [senderId], references: [id])
   receiverId Int
   senderId   Int
+}
+
+model SubReddit {
+  id          Int    @id @default(autoincrement())
+  subscribers User[] @relation("subreddits")
+  posts       Post[]
 }

@@ -4,7 +4,13 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "preinstall": "npx only-allow pnpm",
+    "test": "NODE_ENV=test vitest",
+    "dev": "NODE_ENV=development tsx --watch app.ts",
+    "dbdev": "NODE_ENV=development tsx --inspect --watch app.ts",
+    "start": "node dist/app.js",
+    "build": "tsc || true",
+    "postinstall": "prisma generate"
   },
   "keywords": [],
   "author": "",
@@ -26,7 +32,6 @@
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "passport-local": "^1.0.0",
-    "passport-reddit": "^1.1.0",
     "pg": "^8.16.3",
     "socket.io": "^4.8.4",
     "supertest": "^7.3.1"

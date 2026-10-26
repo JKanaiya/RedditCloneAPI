@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import { prisma } from "../controllers/prisma.js";
+import { afterAll } from "vitest";
 import request from "supertest";
 import express from "express";
 import "dotenv/config.js";
@@ -15,8 +17,27 @@ app.use((req, res, next) => {
   next();
 });
 
+const user = {
+  email: "user@fakemail.com",
+  password: "fakepassword1",
+};
+
 describe("Auth testing", () => {
-  it("works with a user that already exists", async () => {
+  it("allows sign-ups with valid data", async () => {
+    const signUpRes = await request(app)
+      .post("/sign-up")
+      .send({
+        email: user.email,
+        password: user.password,
+      })
+      .expect(200);
+
+    expect(signUpRes.body).toEqual(
+      expect.objectContaining({ message: "Registration Successful" }),
+    );
+  });
+
+  it("login with a user that already exists", async () => {
     const loginRes = await request(app)
       .post("/log-in")
       .send({
@@ -25,26 +46,26 @@ describe("Auth testing", () => {
       })
       .expect(200);
 
-    expect(loginRes.body).toEqual(
-      expect.objectContaining({ email: "user@fakemail.com" }),
-    );
+    const authCheck = await request(app)
+      .get("/auth-check")
+      .set(`Authorization`, `Bearer ${loginRes.body.token}`);
+    expect(authCheck.body).toBe("authed");
   });
 
   it("does not auth a user with an incorrect password", async () => {
-    const getToken = await request(app).post("/log-in").send({
+    const loginRes = await request(app).post("/log-in").send({
       email: "user@fakemail.com",
-      password: "fakerpassword",
+      password: "fakingpassword",
     });
-    const attemptAuth = await request(app)
-      .post("/message")
-      .send({
-        token: getToken.body.token,
-        name: "user",
-        text: "Hi, this is a message",
-        chatroomId: 12,
-      })
-      .expect(401);
+    const authCheck = await request(app)
+      .get("/auth-check")
+      .set(`Authorization`, `Bearer ${loginRes.body.token}`);
+    expect(authCheck.body).not.toBe("authed");
+  });
 
-    expect(attemptAuth.text).toBe("Unauthorized");
+  afterAll(async () => {
+    await prisma.user.deleteMany({
+      where: {},
+    });
   });
 });

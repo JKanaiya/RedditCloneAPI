@@ -12,7 +12,7 @@
     pkgs.prisma-language-server
     pkgs.prisma_7
     pkgs.prisma-engines_7
-    pkgs.nodejs
+    pkgs.nodejs_22
   ];
 
   # devenv.sh/languages/
