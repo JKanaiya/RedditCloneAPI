@@ -24,8 +24,10 @@ const users = [
   },
 ];
 
+const now = new Date();
+
 beforeAll(async () => {
-  await prisma.user.create({
+  const user1 = await prisma.user.create({
     data: {
       name: users[0]!.name,
       email: users[0]!.email,
@@ -39,14 +41,27 @@ beforeAll(async () => {
       password: users[1]!.password,
     },
   });
+  await prisma.subReddit.create({
+    data: { id: 500, name: "0thSub" },
+  });
+  await prisma.post.create({
+    data: {
+      subRedditId: 500,
+      text: "Wow, i can hear my voice echo in this void.",
+      title: "Hello?",
+      created: now.toISOString(),
+      userId: user1!.id,
+    },
+  });
 });
 
 afterAll(async () => {
+  await prisma.subReddit.deleteMany({
+    where: {},
+  });
   await prisma.user.deleteMany({
     where: {},
   });
-  const user = await prisma.user.findMany();
-  console.log(user);
 });
 
 export { request };

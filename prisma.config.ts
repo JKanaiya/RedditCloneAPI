@@ -10,6 +10,6 @@ export default defineConfig({
     seed: "tsx prisma/dbSetup.ts",
   },
   datasource: {
-    url: env("TEST_DATABASE_URL"),
+    url: env("DATABASE_URL"),
   },
 });
