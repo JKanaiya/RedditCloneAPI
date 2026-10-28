@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { prisma } from "../controllers/prisma.js";
 import bcrypt from "bcryptjs";
 
 import { faker } from "@faker-js/faker";
@@ -7,8 +8,29 @@ import express from "express";
 import "dotenv/config.js";
 import cors from "cors";
 import indexRouter from "../routes/indexRouter.js";
+import { acceptFollowRequest } from "../controllers/indexController.js";
 
-const randomEmail = faker.internet.email();
+const createRandomUserData = () => {
+  const name = faker.person.firstName();
+  const email = faker.internet.email();
+  return {
+    name,
+    email,
+    password: "",
+  };
+};
+
+const createUsers = async (count: number) => {
+  let users = [];
+  for (let n = 0; n <= count; n++) {
+    const user = createRandomUserData();
+    user.password = `fakepassword${n}`;
+    users.push(user);
+  }
+  return users;
+};
+
+const users = await createUsers(5);
 
 const app = express();
 
@@ -20,36 +42,30 @@ app.use((req, res, next) => {
   next();
 });
 
-const user = {
-  email: "user2@fakemail.com",
-  password: "fakepassword3",
-};
-
-const passwords = {
-  password1: await bcrypt.hash("fakepassword1", 10),
-  password2: await bcrypt.hash("fakepassword2", 10),
-};
-
-const users = [
-  {
-    email: "user@fakemail.com",
-    name: "fakename",
-    password: passwords.password1,
-  },
-  {
-    email: "user1@fakemail.com",
-    name: "fakename1",
-    password: passwords.password2,
-  },
-];
-
 describe("Auth testing", () => {
+  beforeAll(async () => {
+    await prisma.user.create({
+      data: {
+        name: users[0]!.name,
+        email: users[0]!.email,
+        password: await bcrypt.hash(users[0]!.password, 10),
+      },
+    });
+    await prisma.user.create({
+      data: {
+        name: users[1]!.name,
+        email: users[1]!.email,
+        password: await bcrypt.hash(users[1]!.password, 10),
+      },
+    });
+  });
+
   it("allows sign-ups with valid data", async () => {
     const signUpRes = await request(app)
       .post("/sign-up")
       .send({
-        email: randomEmail,
-        password: "fakepassword3",
+        email: users[2]!.email,
+        password: users[2]!.password,
       })
       .expect(200);
 
@@ -62,8 +78,8 @@ describe("Auth testing", () => {
     const loginRes = await request(app)
       .post("/log-in")
       .send({
-        email: "user@fakemail.com",
-        password: "fakepassword1",
+        email: users[0]!.email,
+        password: users[0]!.password,
       })
       .expect(200);
 
@@ -75,7 +91,7 @@ describe("Auth testing", () => {
 
   it("does not auth a user with an incorrect password", async () => {
     const loginRes = await request(app).post("/log-in").send({
-      email: "user@fakemail.com",
+      email: users[0]!.email,
       password: "fakingpassword",
     });
     const authCheck = await request(app)
@@ -83,22 +99,55 @@ describe("Auth testing", () => {
       .set(`Authorization`, `Bearer ${loginRes.body.token}`);
     expect(authCheck.body).not.toBe("authed");
   });
+
+  afterAll(async () => {
+    try {
+      await prisma.user.deleteMany({});
+    } catch (error) {
+      console.error(error);
+    }
+  });
 });
 
 describe("Subreddit + Post Testing", async () => {
-  const loginRes = await request(app).post("/log-in").send({
-    email: user.email,
-    password: user.password,
+  let post;
+  beforeAll(async () => {
+    const now = new Date();
+
+    const user1 = await prisma.user.create({
+      data: {
+        name: users[2]!.name,
+        email: users[2]!.email,
+        password: await bcrypt.hash(users[2]!.password, 10),
+      },
+    });
+
+    await prisma.subReddit.create({
+      data: { id: 500, name: "0thSub" },
+    });
+
+    post = await prisma.post.create({
+      data: {
+        subRedditId: 500,
+        text: "Wow, i can hear my voice echo in this void.",
+        title: "Hello?",
+        created: now.toISOString(),
+        userId: user1!.id,
+      },
+    });
   });
 
-  let post;
+  const loginRes = await request(app).post("/log-in").send({
+    email: users[2]!.email,
+    password: users[2]!.password,
+  });
 
   it("User can create a subreddit", async () => {
     const subreddit = await request(app)
       .post("/subreddit")
       .set(`Authorization`, `Bearer ${loginRes.body.token}`)
       .send({
-        email: "user@fakemail.com",
+        email: users[2]!.email,
         name: "firstSub",
       });
     expect(subreddit.body).toEqual(
@@ -111,7 +160,7 @@ describe("Subreddit + Post Testing", async () => {
       .post("/subscribe")
       .set(`Authorization`, `Bearer ${loginRes.body.token}`)
       .send({
-        email: "user@fakemail.com",
+        email: users[2]!.email,
         name: "firstSub",
       });
     expect(subscribed.body).toEqual(
@@ -131,7 +180,6 @@ describe("Subreddit + Post Testing", async () => {
     expect(posted.body).toEqual(
       expect.objectContaining({ message: "Posted to Subreddit" }),
     );
-    post = posted.body.post;
   });
 
   it("Comments on existing posts, comments on existing comments, votes on comment", async () => {
@@ -140,7 +188,7 @@ describe("Subreddit + Post Testing", async () => {
       .set(`Authorization`, `Bearer ${loginRes.body.token}`)
       .send({
         postId: post.id,
-        email: users[0]!.email,
+        email: users[2]!.email,
         text: "I am a comment on this post",
       });
     expect(comment.body).toEqual(
@@ -181,32 +229,114 @@ describe("Subreddit + Post Testing", async () => {
       expect.objectContaining({ message: "Voted on Post" }),
     );
   });
+  afterAll(async () => {
+    try {
+      await prisma.vote.deleteMany({});
+      await prisma.comment.deleteMany({});
+      await prisma.post.deleteMany({});
+      await prisma.subReddit.deleteMany({});
+      await prisma.user.deleteMany({});
+    } catch (error) {
+      console.error(error);
+    }
+  });
 });
 
 describe("Follow Requests", async () => {
-  const loginRes = await request(app).post("/log-in").send({
-    email: user.email,
-    password: user.password,
+  beforeAll(async () => {
+    await prisma.user.create({
+      data: {
+        name: users[3]!.name,
+        email: users[3]!.email,
+        password: await bcrypt.hash(users[3]!.password, 10),
+      },
+    });
+
+    await prisma.user.create({
+      data: {
+        name: users[4]!.name,
+        email: users[4]!.email,
+        password: await bcrypt.hash(users[4]!.password, 10),
+      },
+    });
   });
 
-  it("Requests sent to user appear in the array.\nAccepted requests adds the sender to the user's followers array", async () => {
+  const loginRes = await request(app).post("/log-in").send({
+    email: users[3]!.email,
+    password: users[3]!.password,
+  });
+
+  const secondUser = await request(app).post("/log-in").send({
+    email: users[4]!.email,
+    password: users[4]!.password,
+  });
+
+  it("Requests sent to other user are added to their follow request array.\nAccepted requests adds the sender to the user's followers array", async () => {
     const currentUserFollRequest = await request(app)
       .post("/follow-request")
       .set(`Authorization`, `Bearer ${loginRes.body.token}`)
       .send({
-        receiver: randomEmail,
+        receiverEmail: users[4]!.email,
       });
-    expect(currentUserFollRequest.body).toEqual(
-      expect.objectContaining({ message: "Follow Request Sent" }),
-    );
+
+    expect(
+      currentUserFollRequest.body.requestSent.followRequests.length,
+    ).toBeGreaterThan(0);
 
     const acceptedFollowRequest = await request(app)
       .get("/accept-follow-request")
-      .query({ fRequestId: currentUserFollRequest.body.FollowRequest.id })
-      .set(`Authorization`, `Bearer ${loginRes.body.token}`);
-    expect(acceptedFollowRequest.body).toEqual(
-      expect.objectContaining({ message: "Follow Request Accepted" }),
+      .set(`Authorization`, `Bearer ${secondUser.body.token}`)
+      .query({
+        follReqId: currentUserFollRequest.body.requestSent.followRequests[0].id,
+      });
+
+    expect(acceptedFollowRequest.body.addFollower.followers[0]).toEqual(
+      expect.objectContaining({ email: users[3]!.email }),
     );
   });
-  it("Accepted requests adds the sender to the user's followers array", async () => {});
+  afterAll(async () => {
+    try {
+      await prisma.followRequest.deleteMany({});
+      await prisma.user.deleteMany({});
+    } catch (error) {
+      console.error(error);
+    }
+  });
+});
+
+describe("User Profile", async () => {
+  beforeAll(async () => {
+    await prisma.user.create({
+      data: {
+        name: users[3]!.name,
+        email: users[3]!.email,
+        password: await bcrypt.hash(users[3]!.password, 10),
+      },
+    });
+  });
+
+  const loginRes = await request(app).post("/log-in").send({
+    email: users[3]!.email,
+    password: users[3]!.password,
+  });
+
+  it("User can update profile name", async () => {
+    const user = await request(app)
+      .patch("/user")
+      .set(`Authorization`, `Bearer ${loginRes.body.token}`)
+      .send({
+        newName: faker.person.firstName,
+      });
+    expect(user.body).toEqual(
+      expect.objectContaining({ message: "Name Changed" }),
+    );
+  });
+
+  afterAll(async () => {
+    try {
+      await prisma.user.deleteMany({});
+    } catch (error) {
+      console.error(error);
+    }
+  });
 });

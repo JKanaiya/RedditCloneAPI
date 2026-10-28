@@ -26,42 +26,39 @@ const users = [
 
 const now = new Date();
 
-beforeAll(async () => {
-  const user1 = await prisma.user.create({
-    data: {
-      name: users[0]!.name,
-      email: users[0]!.email,
-      password: users[0]!.password,
-    },
-  });
-  await prisma.user.create({
-    data: {
-      name: users[1]!.name,
-      email: users[1]!.email,
-      password: users[1]!.password,
-    },
-  });
-  await prisma.subReddit.create({
-    data: { id: 500, name: "0thSub" },
-  });
-  await prisma.post.create({
-    data: {
-      subRedditId: 500,
-      text: "Wow, i can hear my voice echo in this void.",
-      title: "Hello?",
-      created: now.toISOString(),
-      userId: user1!.id,
-    },
-  });
-});
-
-afterAll(async () => {
-  await prisma.subReddit.deleteMany({
-    where: {},
-  });
-  await prisma.user.deleteMany({
-    where: {},
-  });
-});
+// beforeAll(async () => {
+//   const user1 = await prisma.user.create({
+//     data: {
+//       name: users[0]!.name,
+//       email: users[0]!.email,
+//       password: users[0]!.password,
+//     },
+//   });
+//   await prisma.subReddit.create({
+//     data: { id: 500, name: "0thSub" },
+//   });
+//   await prisma.post.create({
+//     data: {
+//       subRedditId: 500,
+//       text: "Wow, i can hear my voice echo in this void.",
+//       title: "Hello?",
+//       created: now.toISOString(),
+//       userId: user1!.id,
+//     },
+//   });
+// });
+//
+// afterAll(async () => {
+//   try {
+//     await prisma.followRequest.deleteMany({});
+//     await prisma.vote.deleteMany({});
+//     await prisma.comment.deleteMany({});
+//     await prisma.post.deleteMany({});
+//     await prisma.subReddit.deleteMany({});
+//     await prisma.user.deleteMany({});
+//   } catch (error) {
+//     console.error(error);
+//   }
+// });
 
 export { request };

@@ -50,7 +50,6 @@ passport.use(
       }
 
       const match = await bcrypt.compare(jwt_payload.password, user.password);
-      // console.log(match);
       // const equalEmail = jwt_payload.email === user.email;
       // const equalPass = await bcrypt.compare(
       //   jwt_payload.password,

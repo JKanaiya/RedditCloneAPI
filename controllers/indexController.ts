@@ -124,14 +124,12 @@ const subredditPost = [
   async (req: Request, res: Response) => {
     const now = new Date();
     const { title, text, subName } = req.body;
-    console.log(title);
     try {
       const subreddit = await prisma.subReddit.findFirst({
         where: {
           name: subName,
         },
       });
-      console.log(subreddit);
       if (subreddit) {
         const post = await prisma.post.create({
           data: {
@@ -211,6 +209,138 @@ const commentVote = [
   },
 ];
 
+// model FollowRequest {
+//   id         Int  @id @default(autoincrement())
+//   receiver   User @relation("FollowRequests", fields: [receiverId], references: [id])
+//   sender     User @relation("SentRequest", fields: [senderId], references: [id])
+//   receiverId Int
+//   senderId   Int
+// }
+
+const createFollowRequest = [
+  passport.authenticate("jwt", { session: false }),
+  async (req: Request, res: Response) => {
+    const { receiverEmail } = req.body;
+    try {
+      const receiver = await prisma.user.findFirst({
+        where: {
+          email: receiverEmail,
+        },
+        include: {
+          followRequests: true,
+        },
+      });
+      if (receiver) {
+        const followRequest = await prisma.followRequest.create({
+          data: {
+            receiverId: receiver.id,
+            senderId: req.user.id,
+          },
+        });
+        const requestSent = await prisma.user.update({
+          where: {
+            id: receiver.id,
+          },
+          data: {
+            followRequests: {
+              set: [...receiver.followRequests, followRequest],
+            },
+          },
+          include: {
+            followRequests: true,
+          },
+        });
+        res.status(200).json({
+          message: "Follow Request Sent",
+          requestSent,
+        });
+      } else {
+        throw new Error();
+      }
+    } catch (e) {
+      console.log(e);
+      res.status(400).json(e);
+    }
+  },
+];
+
+const acceptFollowRequest = [
+  passport.authenticate("jwt", { session: false }),
+  async (req: Request, res: Response) => {
+    try {
+      const followRequest = await prisma.followRequest.findFirst({
+        where: {
+          id: Number(req.query.follReqId),
+        },
+      });
+      if (followRequest) {
+        const sender = await prisma.user.findFirst({
+          where: {
+            id: followRequest.senderId,
+          },
+        });
+        if (req.user.id == followRequest.receiverId && sender != null) {
+          const receiver = await prisma.user.findFirst({
+            where: {
+              id: req.user.id,
+            },
+            include: {
+              followers: true,
+            },
+          });
+          const addFollower = await prisma.user.update({
+            where: {
+              id: req.user.id,
+            },
+            data: {
+              followers: {
+                set: [...receiver.followers, sender],
+              },
+            },
+            include: {
+              followers: true,
+            },
+          });
+          await prisma.followRequest.delete({
+            where: {
+              id: followRequest.id,
+            },
+          });
+          res
+            .status(200)
+            .json({ message: "Follow Request Accepted", addFollower });
+        }
+      } else {
+        throw new Error();
+      }
+    } catch (e) {
+      console.log(e);
+      res.status(400).json(e);
+    }
+  },
+];
+
+const updateUser = [
+  passport.authenticate("jwt", { session: false }),
+  async (req: Request, res: Response) => {
+    const { newName } = req.body;
+    try {
+      const user = await prisma.user.update({
+        where: {
+          email: req.user.email,
+        },
+        data: {
+          name: newName,
+        },
+      });
+      res.status(200).json({ message: "Name Changed", user });
+    } catch (e) {
+      console.log(e);
+      res.status(400).json(e);
+    }
+  },
+];
+
 export {
   createSubreddit,
   subscribe,
@@ -219,4 +349,7 @@ export {
   subComment,
   postVote,
   commentVote,
+  createFollowRequest,
+  acceptFollowRequest,
+  updateUser,
 };
