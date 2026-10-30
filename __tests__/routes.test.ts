@@ -10,6 +10,13 @@ import cors from "cors";
 import indexRouter from "../routes/indexRouter.js";
 import { acceptFollowRequest } from "../controllers/indexController.js";
 
+const createRandomPosts = () => {
+  return {
+    title: faker.book.title(),
+    text: faker.lorem.lines(1),
+  };
+};
+
 const createRandomUserData = () => {
   const name = faker.person.firstName();
   const email = faker.internet.email();
@@ -294,9 +301,129 @@ describe("Follow Requests", async () => {
       expect.objectContaining({ email: users[3]!.email }),
     );
   });
+  it("Allows a rejection of a follow request", async () => {
+    const currentUserFollRequest = await request(app)
+      .post("/follow-request")
+      .set(`Authorization`, `Bearer ${secondUser.body.token}`)
+      .send({
+        receiverEmail: users[3]!.email,
+      });
+
+    expect(
+      currentUserFollRequest.body.requestSent.followRequests.length,
+    ).toBeGreaterThan(0);
+
+    const rejectedFollowRequest = await request(app)
+      .get("/reject-follow-request")
+      .set(`Authorization`, `Bearer ${loginRes.body.token}`)
+      .query({
+        follReqId: currentUserFollRequest.body.requestSent.followRequests[0].id,
+      });
+
+    expect(rejectedFollowRequest.body.denier.followers[0]).not.toEqual(
+      expect.objectContaining({ email: users[4]!.email }),
+    );
+  });
   afterAll(async () => {
     try {
       await prisma.followRequest.deleteMany({});
+      await prisma.user.deleteMany({});
+    } catch (error) {
+      console.error(error);
+    }
+  });
+});
+
+describe("Post filtering", async () => {
+  const posts = [createRandomPosts(), createRandomPosts()];
+  beforeAll(async () => {
+    const now = new Date();
+    const subreddit = await prisma.subReddit.create({
+      data: {
+        name: "0thReddit",
+      },
+    });
+    for (let n = 0; n < 3; n++) {
+      const user = await prisma.user.create({
+        data: {
+          name: users[n]!.name,
+          email: users[n]!.email,
+          password: await bcrypt.hash(users[n]!.password, 10),
+        },
+      });
+      if (n != 0) {
+        for (let a = 0; a < 2; a++) {
+          await prisma.post.create({
+            data: {
+              userId: user.id,
+              title: posts[n - 1]!.title,
+              created: now.toISOString(),
+              text: posts[n - 1]!.text,
+              subRedditId: subreddit.id,
+            },
+          });
+        }
+        const user1 = await prisma.user.findFirst({
+          where: {
+            email: users[0]!.email,
+          },
+          include: { following: true },
+        });
+
+        await prisma.user.update({
+          where: {
+            email: users[0]!.email,
+          },
+          data: {
+            following: {
+              set: [...user1?.following, user],
+            },
+          },
+          include: { following: true },
+        });
+        //
+        // const thisUser = await prisma.user.findFirst({
+        //   where: {
+        //     email: users[n]!.email,
+        //   },
+        //   include: { followers: true },
+        // });
+        // await prisma.user.update({
+        //   where: {
+        //     email: users[n]!.email,
+        //   },
+        //   data: {
+        //     followers: {
+        //       set: [...thisUser.followers, user1],
+        //     },
+        //   },
+        // });
+      }
+    }
+  });
+
+  const loginRes = await request(app).post("/log-in").send({
+    email: users[0]!.email,
+    password: users[0]!.password,
+  });
+
+  it("Returns posts from followed users", async () => {
+    const userFilteredPosts = await request(app)
+      .get("/user-posts")
+      .set(`Authorization`, `Bearer ${loginRes.body.token}`);
+
+    expect(userFilteredPosts.body[0]).toEqual(
+      expect.objectContaining({ title: posts[0]?.title }),
+    );
+
+    expect(userFilteredPosts.body[userFilteredPosts.body.length - 1]).toEqual(
+      expect.objectContaining({ title: posts[1]?.title }),
+    );
+  });
+  afterAll(async () => {
+    try {
+      await prisma.post.deleteMany({});
+      await prisma.subReddit.deleteMany({});
       await prisma.user.deleteMany({});
     } catch (error) {
       console.error(error);

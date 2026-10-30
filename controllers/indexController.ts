@@ -151,6 +151,36 @@ const subredditPost = [
   },
 ];
 
+const getFollowingPosts = [
+  passport.authenticate("jwt", { session: false }),
+  async (req: Request, res: Response) => {
+    try {
+      const user = await prisma.user.findFirst({
+        where: {
+          id: req.user.id,
+        },
+        include: { following: true },
+      });
+
+      const ids = user?.following.map((user) => user.id);
+
+      const posts = await prisma.post.findMany({
+        where: {
+          userId: { in: ids },
+        },
+      });
+      if (posts) {
+        res.status(200).json(posts);
+      } else {
+        throw new Error();
+      }
+    } catch (e) {
+      console.log(e);
+      res.status(400).json(e);
+    }
+  },
+];
+
 const postVote = [
   passport.authenticate("jwt", { session: false }),
   async (req: Request, res: Response) => {
@@ -264,6 +294,47 @@ const createFollowRequest = [
   },
 ];
 
+const rejectFollowRequest = [
+  passport.authenticate("jwt", { session: false }),
+  async (req: Request, res: Response) => {
+    try {
+      const followRequest = await prisma.followRequest.findFirst({
+        where: {
+          id: Number(req.query.follReqId),
+        },
+      });
+      if (followRequest) {
+        const sender = await prisma.user.findFirst({
+          where: {
+            id: followRequest.senderId,
+          },
+        });
+        if (req.user.id == followRequest.receiverId && sender != null) {
+          const denier = await prisma.user.findFirst({
+            where: {
+              id: req.user.id,
+            },
+            include: {
+              followers: true,
+            },
+          });
+          await prisma.followRequest.delete({
+            where: {
+              id: followRequest.id,
+            },
+          });
+          res.status(200).json({ message: "Follow Request Rejected", denier });
+        }
+      } else {
+        throw new Error();
+      }
+    } catch (e) {
+      console.log(e);
+      res.status(400).json(e);
+    }
+  },
+];
+
 const acceptFollowRequest = [
   passport.authenticate("jwt", { session: false }),
   async (req: Request, res: Response) => {
@@ -351,5 +422,7 @@ export {
   commentVote,
   createFollowRequest,
   acceptFollowRequest,
+  rejectFollowRequest,
+  getFollowingPosts,
   updateUser,
 };

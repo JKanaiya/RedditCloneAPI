@@ -13,6 +13,8 @@ import {
   createFollowRequest,
   acceptFollowRequest,
   updateUser,
+  rejectFollowRequest,
+  getFollowingPosts,
 } from "../controllers/indexController.js";
 
 const indexRouter = express.Router();
@@ -25,6 +27,8 @@ indexRouter.get(
   },
 );
 indexRouter.get("/accept-follow-request", acceptFollowRequest);
+indexRouter.get("/reject-follow-request", rejectFollowRequest);
+indexRouter.get("/user-posts", getFollowingPosts);
 indexRouter.post("/sign-up", signUp);
 indexRouter.post("/subreddit", createSubreddit);
 indexRouter.post("/subscribe", subscribe);
