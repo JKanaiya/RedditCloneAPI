@@ -97,6 +97,11 @@ const logIn = async (req: Request, res: Response) => {
         where: {
           email: req.body.email,
         },
+        include: {
+          followers: true,
+          following: true,
+          followRequests: true,
+        },
       });
       return void res.status(200).json({ token, user: user });
     }

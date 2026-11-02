@@ -15,6 +15,9 @@ import {
   updateUser,
   rejectFollowRequest,
   getFollowingPosts,
+  getPosts,
+  subreddits,
+  getUsers,
 } from "../controllers/indexController.js";
 
 const indexRouter = express.Router();
@@ -27,6 +30,9 @@ indexRouter.get(
   },
 );
 indexRouter.get("/accept-follow-request", acceptFollowRequest);
+indexRouter.get("/posts", getPosts);
+indexRouter.get("/users", getUsers);
+indexRouter.get("/subreddits", subreddits);
 indexRouter.get("/reject-follow-request", rejectFollowRequest);
 indexRouter.get("/user-posts", getFollowingPosts);
 indexRouter.post("/sign-up", signUp);

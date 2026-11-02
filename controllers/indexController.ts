@@ -19,14 +19,57 @@ const createSubreddit = [
     }
   },
 ];
+const getUsers = [
+  passport.authenticate("jwt", { session: false }),
+  async (req: Request, res: Response) => {
+    try {
+      const users = await prisma.user.findMany({
+        include: { followers: true, following: true },
+      });
+      res.status(200).json(users);
+    } catch (e) {
+      res.status(400).json({ error: e, message: "Failed to Get Users" });
+    }
+  },
+];
+
+const getPosts = [
+  passport.authenticate("jwt", { session: false }),
+  async (req: Request, res: Response) => {
+    try {
+      const posts = await prisma.post.findMany({
+        include: { votes: true },
+      });
+      res.status(200).json(posts);
+    } catch (e) {
+      res.status(400).json({ error: e, message: "Failed to Get Posts" });
+    }
+  },
+];
+
+const subreddits = [
+  passport.authenticate("jwt", { session: false }),
+  async (req: Request, res: Response) => {
+    try {
+      const subreddits = await prisma.subReddit.findMany({
+        include: {
+          posts: true,
+        },
+      });
+      res.status(200).json(subreddits);
+    } catch (e) {
+      res.status(400).json({ error: e, message: "Failed to Get Subreddits" });
+    }
+  },
+];
 
 const subscribe = [
   passport.authenticate("jwt", { session: false }),
   async (req: Request, res: Response) => {
-    const { email, name } = req.body;
+    const { name } = req.body;
     try {
       const user = await prisma.user.findFirst({
-        where: { email: email },
+        where: { email: req.user?.email },
       });
       if (user) {
         const subreddit = await prisma.subReddit.findFirst({
@@ -63,7 +106,7 @@ const subscribe = [
 const comment = [
   passport.authenticate("jwt", { session: false }),
   async (req: Request, res: Response) => {
-    const { email, text, postId } = req.body;
+    const { text, postId } = req.body;
     try {
       const post = await prisma.post.findFirst({
         where: {
@@ -416,6 +459,7 @@ export {
   createSubreddit,
   subscribe,
   comment,
+  subreddits,
   subredditPost,
   subComment,
   postVote,
@@ -425,4 +469,6 @@ export {
   rejectFollowRequest,
   getFollowingPosts,
   updateUser,
+  getPosts,
+  getUsers,
 };
