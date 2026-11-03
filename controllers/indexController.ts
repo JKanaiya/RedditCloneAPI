@@ -24,7 +24,11 @@ const getUsers = [
   async (req: Request, res: Response) => {
     try {
       const users = await prisma.user.findMany({
-        include: { followers: true, following: true },
+        include: {
+          followers: true,
+          following: true,
+          posts: { include: { votes: true } },
+        },
       });
       res.status(200).json(users);
     } catch (e) {
@@ -38,7 +42,7 @@ const getPosts = [
   async (req: Request, res: Response) => {
     try {
       const posts = await prisma.post.findMany({
-        include: { votes: true },
+        include: { votes: true, comments: { include: { subComments: true } } },
       });
       res.status(200).json(posts);
     } catch (e) {
@@ -211,6 +215,7 @@ const getFollowingPosts = [
         where: {
           userId: { in: ids },
         },
+        include: { votes: true },
       });
       if (posts) {
         res.status(200).json(posts);
@@ -235,14 +240,32 @@ const postVote = [
         },
       });
       if (post) {
-        const vote = await prisma.vote.create({
-          data: {
-            positive,
-            postId,
-            userId: req.user.id,
+        const userVote = await prisma.vote.findFirst({
+          where: {
+            userId: req.user?.id,
+            postId: post.id,
           },
         });
-        res.status(200).json({ message: "Voted on Post", vote });
+        if (userVote) {
+          const vote = await prisma.vote.update({
+            where: {
+              id: userVote.id,
+            },
+            data: {
+              positive,
+            },
+          });
+          res.status(200).json({ message: "Updated Vote on Post", vote });
+        } else {
+          const vote = await prisma.vote.create({
+            data: {
+              positive,
+              postId,
+              userId: req.user?.id,
+            },
+          });
+          res.status(200).json({ message: "Voted on Post", vote });
+        }
       } else {
         throw new Error();
       }
@@ -264,14 +287,32 @@ const commentVote = [
         },
       });
       if (comment) {
-        const vote = await prisma.vote.create({
-          data: {
-            positive,
-            commentId,
-            userId: req.user.id,
+        const userVote = await prisma.vote.findFirst({
+          where: {
+            userId: req.user?.id,
+            commentId: comment.id,
           },
         });
-        res.status(200).json({ message: "Voted on Comment", vote });
+        if (userVote) {
+          const vote = await prisma.vote.update({
+            where: {
+              id: userVote.id,
+            },
+            data: {
+              positive,
+            },
+          });
+          res.status(200).json({ message: "Updated Vote on Comment", vote });
+        } else {
+          const vote = await prisma.vote.create({
+            data: {
+              positive,
+              commentId,
+              userId: req.user?.id,
+            },
+          });
+          res.status(200).json({ message: "Voted on Comment", vote });
+        }
       } else {
         throw new Error();
       }

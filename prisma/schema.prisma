@@ -18,7 +18,7 @@ model Post {
   title       String
   text        String
   userId      Int
-  Comment     Comment[]
+  comments    Comment[]
   created     DateTime
   edited      DateTime?
   subReddit   SubReddit? @relation(fields: [subRedditId], references: [id])
@@ -47,7 +47,7 @@ model User {
   Comment            Comment[]
   following          User[]          @relation("FollowingUsers")
   followers          User[]          @relation("FollowingUsers")
-  Post               Post[]
+  posts              Post[]
   followRequests     FollowRequest[] @relation("FollowRequests")
   sentFollowRequests FollowRequest[] @relation("SentRequest")
   subReddits         SubReddit[]     @relation("subreddits")
