@@ -62,6 +62,7 @@ model Comment {
   userId          Int
   User            User      @relation(fields: [userId], references: [id])
   edited          DateTime?
+  created         DateTime
   parentCommentId Int?
   parentComment   Comment?  @relation("commentSubComments", fields: [parentCommentId], references: [id])
   subComments     Comment[] @relation("commentSubComments")

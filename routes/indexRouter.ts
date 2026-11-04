@@ -18,6 +18,8 @@ import {
   getPosts,
   subreddits,
   getUsers,
+  updateComment,
+  deleteComment,
 } from "../controllers/indexController.js";
 
 const indexRouter = express.Router();
@@ -46,5 +48,7 @@ indexRouter.post("/vote-post", postVote);
 indexRouter.post("/vote-comment", commentVote);
 indexRouter.post("/follow-request", createFollowRequest);
 indexRouter.patch("/user", updateUser);
+indexRouter.patch("/comment", updateComment);
+indexRouter.delete("/comment", deleteComment);
 
 export default indexRouter;

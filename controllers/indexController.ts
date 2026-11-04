@@ -323,13 +323,85 @@ const commentVote = [
   },
 ];
 
-// model FollowRequest {
-//   id         Int  @id @default(autoincrement())
-//   receiver   User @relation("FollowRequests", fields: [receiverId], references: [id])
-//   sender     User @relation("SentRequest", fields: [senderId], references: [id])
-//   receiverId Int
-//   senderId   Int
-// }
+const updateComment = [
+  passport.authenticate("jwt", { session: false }),
+  async (req: Request, res: Response) => {
+    const now = new Date();
+    const { commentId, text } = req.body;
+    try {
+      const user = await prisma.user.findFirst({
+        where: {
+          id: req.user?.id,
+        },
+      });
+      const comment = await prisma.comment.findFirst({
+        where: {
+          id: commentId,
+        },
+      });
+
+      if (user && comment && user.id == comment.userId) {
+        const oldDate = new Date(comment?.created);
+        const diff = Math.abs(now - oldDate) / 60 / 1000;
+        if (diff <= 30) {
+          const updated = await prisma.comment.update({
+            where: {
+              id: commentId,
+            },
+            data: {
+              text: text,
+            },
+          });
+          res.status(200).json({
+            message: "Comment Updated",
+            updated,
+          });
+        }
+      }
+    } catch (e) {
+      console.log(e);
+      res.status(400).json(e);
+    }
+  },
+];
+
+const deleteComment = [
+  passport.authenticate("jwt", { session: false }),
+  async (req: Request, res: Response) => {
+    const { commentId } = req.query;
+    try {
+      const user = await prisma.user.findFirst({
+        where: {
+          id: req.user?.id,
+        },
+      });
+      const comment = await prisma.comment.findFirst({
+        where: {
+          id: commentId,
+        },
+      });
+      if (user && comment && user.id == comment.userId) {
+        await prisma.vote.deleteMany({
+          where: {
+            commentId,
+          },
+        });
+        const deleted = await prisma.comment.delete({
+          where: {
+            id: commentId,
+          },
+        });
+        res.status(200).json({
+          message: "Comment Deleted",
+          deleted,
+        });
+      }
+    } catch (e) {
+      console.log(e);
+      res.status(400).json(e);
+    }
+  },
+];
 
 const createFollowRequest = [
   passport.authenticate("jwt", { session: false }),
@@ -503,6 +575,8 @@ export {
   subreddits,
   subredditPost,
   subComment,
+  deleteComment,
+  updateComment,
   postVote,
   commentVote,
   createFollowRequest,
