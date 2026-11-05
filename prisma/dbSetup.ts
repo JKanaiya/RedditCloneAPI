@@ -44,6 +44,44 @@ const users = createUsers(15);
 const posts = createPosts(7);
 
 async function main() {
+  // await prisma.vote.deleteMany({});
+  // await prisma.comment.deleteMany({});
+  // await prisma.post.deleteMany({});
+  // await prisma.subReddit.deleteMany({});
+  // await prisma.user.deleteMany({
+  //   where: {
+  //     NOT: {
+  //       email: "bla123@fakemail.com",
+  //     },
+  //   },
+  // });
+
+  // const prismaUsers = await prisma.user.findMany({});
+  // const commentlessPosts = await prisma.post.findMany({});
+  //
+  //
+  // let n = 0;
+  // for (let i = 66; i <= 79; i++) {
+  //   console.log(commentlessPosts[n]);
+  //   const subComment = await prisma.comment.upsert({
+  //     where: {
+  //       id: i + 7,
+  //       parentCommentId: i,
+  //     },
+  //     update: {},
+  //     create: {
+  //       text: faker.vehicle.bicycle(),
+  //       userId: prismaUsers[n]!.id,
+  //       postId: commentlessPosts[n]!.id,
+  //       created: now.toISOString(),
+  //       parentCommentId: i,
+  //     },
+  //   });
+  //   if (commentlessPosts[n + 1] != undefined) {
+  //     n++;
+  //   }
+  // }
+
   const now = new Date();
   users.map(async (user) => {
     const bla = await prisma.user.upsert({
@@ -89,7 +127,7 @@ async function main() {
     },
   });
 
-  const prismaUsers = await prisma.user.findMany({});
+  const prismaUsers = await prisma.user.findmany({});
 
   for (let i = 0; i < 7; i++) {
     const post = await prisma.post.upsert({

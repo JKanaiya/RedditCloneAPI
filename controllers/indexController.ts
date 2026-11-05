@@ -51,6 +51,28 @@ const getPosts = [
   },
 ];
 
+const getComments = [
+  passport.authenticate("jwt", { session: false }),
+  async (req: Request, res: Response) => {
+    const { postId } = req.query;
+    try {
+      const post = await prisma.post.findFirst({
+        where: {
+          id: Number(postId),
+        },
+        include: {
+          comments: {
+            include: { subComments: true },
+          },
+        },
+      });
+      res.status(200).json(post?.comments);
+    } catch (e) {
+      res.status(400).json({ error: e, message: "Failed to Get Comments" });
+    }
+  },
+];
+
 const subreddits = [
   passport.authenticate("jwt", { session: false }),
   async (req: Request, res: Response) => {
@@ -585,5 +607,6 @@ export {
   getFollowingPosts,
   updateUser,
   getPosts,
+  getComments,
   getUsers,
 };

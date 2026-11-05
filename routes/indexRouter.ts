@@ -20,6 +20,7 @@ import {
   getUsers,
   updateComment,
   deleteComment,
+  getComments,
 } from "../controllers/indexController.js";
 
 const indexRouter = express.Router();
@@ -33,6 +34,7 @@ indexRouter.get(
 );
 indexRouter.get("/accept-follow-request", acceptFollowRequest);
 indexRouter.get("/posts", getPosts);
+indexRouter.get("/comments", getComments);
 indexRouter.get("/users", getUsers);
 indexRouter.get("/subreddits", subreddits);
 indexRouter.get("/reject-follow-request", rejectFollowRequest);
