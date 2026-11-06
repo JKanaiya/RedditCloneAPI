@@ -62,8 +62,12 @@ const getComments = [
         },
         include: {
           comments: {
-            include: { subComments: true },
+            include: {
+              subComments: { include: { votes: true, subComments: true } },
+              votes: true,
+            },
           },
+          votes: true,
         },
       });
       res.status(200).json(post?.comments);
@@ -162,6 +166,7 @@ const subComment = [
   passport.authenticate("jwt", { session: false }),
   async (req: Request, res: Response) => {
     const { text, commentId } = req.body;
+    const now = new Date();
     try {
       const comment = await prisma.comment.findFirst({
         where: {
@@ -175,6 +180,7 @@ const subComment = [
             text,
             userId: req.user.id,
             postId: comment.postId,
+            created: now.toISOString(),
           },
         });
         res.status(200).json({ message: "Commented on Comment", subComment });
