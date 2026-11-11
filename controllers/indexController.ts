@@ -28,6 +28,8 @@ const getUsers = [
           followers: true,
           following: true,
           posts: { include: { votes: true } },
+          followRequests: { include: { receiver: true, sender: true } },
+          sentFollowRequests: { include: { receiver: true, sender: true } },
         },
       });
       res.status(200).json(users);
@@ -42,7 +44,11 @@ const getPosts = [
   async (req: Request, res: Response) => {
     try {
       const posts = await prisma.post.findMany({
-        include: { votes: true, comments: { include: { subComments: true } } },
+        include: {
+          votes: true,
+          comments: { include: { subComments: true } },
+          user: true,
+        },
       });
       res.status(200).json(posts);
     } catch (e) {
@@ -63,10 +69,29 @@ const getComments = [
         include: {
           comments: {
             include: {
-              subComments: { include: { votes: true, subComments: true } },
+              subComments: {
+                include: {
+                  votes: true,
+                  subComments: {
+                    include: {
+                      votes: true,
+                      subComments: {
+                        include: {
+                          votes: true,
+                          User: true,
+                        },
+                      },
+                      User: true,
+                    },
+                  },
+                  User: true,
+                },
+              },
               votes: true,
+              User: true,
             },
           },
+          user: true,
           votes: true,
         },
       });
@@ -137,6 +162,7 @@ const comment = [
   passport.authenticate("jwt", { session: false }),
   async (req: Request, res: Response) => {
     const { text, postId } = req.body;
+    const now = new Date();
     try {
       const post = await prisma.post.findFirst({
         where: {
@@ -149,6 +175,7 @@ const comment = [
             postId: post.id,
             text,
             userId: req.user.id,
+            created: now.toISOString(),
           },
         });
         res.status(200).json({ message: "Commented on Post", comment });
@@ -257,6 +284,65 @@ const getFollowingPosts = [
   },
 ];
 
+const deleteVote = [
+  passport.authenticate("jwt", { session: false }),
+  async (req: Request, res: Response) => {
+    const { commentId, postId } = req.query;
+    try {
+      if (postId) {
+        const post = await prisma.post.findFirst({
+          where: {
+            id: Number(postId),
+          },
+        });
+        if (post) {
+          const userVote = await prisma.vote.findFirst({
+            where: {
+              userId: req.user?.id,
+              postId: post.id,
+            },
+          });
+          if (userVote) {
+            await prisma.vote.delete({
+              where: {
+                id: userVote.id,
+              },
+            });
+          }
+        }
+      } else if (commentId) {
+        const comment = await prisma.comment.findFirst({
+          where: {
+            id: Number(commentId),
+          },
+        });
+        if (comment) {
+          const userVote = await prisma.vote.findFirst({
+            where: {
+              userId: req.user?.id,
+              commentId: comment.id,
+            },
+          });
+          if (userVote) {
+            await prisma.vote.delete({
+              where: {
+                id: userVote.id,
+              },
+            });
+          }
+        }
+      } else {
+        throw new Error(
+          "Could not find related vote, the vote should have an existing comment or post id sent",
+        );
+      }
+    } catch (e) {
+      console.log(e);
+      res.status(400).json(e);
+    }
+  },
+];
+
 const postVote = [
   passport.authenticate("jwt", { session: false }),
   async (req: Request, res: Response) => {
@@ -351,6 +437,50 @@ const commentVote = [
   },
 ];
 
+const updatePost = [
+  passport.authenticate("jwt", { session: false }),
+  async (req: Request, res: Response) => {
+    const now = new Date();
+    const { postId, text, title } = req.body;
+    console.log(text);
+    try {
+      const user = await prisma.user.findFirst({
+        where: {
+          id: req.user?.id,
+        },
+      });
+      const post = await prisma.post.findFirst({
+        where: {
+          id: postId,
+        },
+      });
+
+      if (user && post && user.id == post.userId) {
+        const oldDate = new Date(post?.created);
+        const diff = Math.abs(now - oldDate) / 60 / 1000;
+        // edits done within 3 minutes of creation do not result in an "edited" value
+        const updated = await prisma.post.update({
+          where: {
+            id: postId,
+          },
+          data: {
+            text: text,
+            title: title,
+            edited: diff > 3 ? now.toISOString() : null,
+          },
+        });
+        res.status(200).json({
+          message: "Post Updated",
+          updated,
+        });
+      }
+    } catch (e) {
+      console.log(e);
+      res.status(400).json(e);
+    }
+  },
+];
+
 const updateComment = [
   passport.authenticate("jwt", { session: false }),
   async (req: Request, res: Response) => {
@@ -371,20 +501,94 @@ const updateComment = [
       if (user && comment && user.id == comment.userId) {
         const oldDate = new Date(comment?.created);
         const diff = Math.abs(now - oldDate) / 60 / 1000;
-        if (diff <= 30) {
-          const updated = await prisma.comment.update({
-            where: {
-              id: commentId,
-            },
-            data: {
-              text: text,
-            },
-          });
-          res.status(200).json({
-            message: "Comment Updated",
-            updated,
-          });
-        }
+        // edits done within 3 minutes of creation do not result in an "edited" value
+        const updated = await prisma.comment.update({
+          where: {
+            id: commentId,
+          },
+          data: {
+            text: text,
+            edited: diff > 3 ? now.toISOString() : null,
+          },
+        });
+        res.status(200).json({
+          message: "Comment Updated",
+          updated,
+        });
+      }
+    } catch (e) {
+      console.log(e);
+      res.status(400).json(e);
+    }
+  },
+];
+
+// NOTE: this would be the functionality to delete a comment,
+// but there is a value in the user's deleted comment leaving a space for the
+// conversation it spawned, so "deleting" a comment just replaces the text with
+// 'comment deleted'
+
+// const deleteComment = [
+//   passport.authenticate("jwt", { session: false }),
+//   async (req: Request, res: Response) => {
+//     const { commentId } = req.query;
+//     try {
+//       const user = await prisma.user.findFirst({
+//         where: {
+//           id: req.user?.id,
+//         },
+//       });
+//       const comment = await prisma.comment.findFirst({
+//         where: {
+//           id: commentId,
+//         },
+//       });
+//       if (user && comment && user.id == comment.userId) {
+//         await prisma.vote.deleteMany({
+//           where: {
+//             commentId,
+//           },
+//         });
+//         const deleted = await prisma.comment.delete({
+//           where: {
+//             id: commentId,
+//           },
+//         });
+//         res.status(200).json({
+//           message: "Comment Deleted",
+//           deleted,
+//         });
+//       }
+//     } catch (e) {
+//       console.log(e);
+//       res.status(400).json(e);
+//     }
+//   },
+// ];
+
+const deletePost = [
+  passport.authenticate("jwt", { session: false }),
+  async (req: Request, res: Response) => {
+    try {
+      const user = await prisma.user.findFirst({
+        where: {
+          id: req.user.id,
+        },
+      });
+      if (user) {
+        const post = await prisma.post.update({
+          where: {
+            id: Number(req.query.postId),
+          },
+          data: {
+            text: "Post has been deleted.",
+            title: "Post has been deleted",
+            edited: new Date().toISOString(),
+          },
+        });
+        res.json(post);
+      } else {
+        throw new Error("Could not connect this user to the specified post");
       }
     } catch (e) {
       console.log(e);
@@ -396,33 +600,25 @@ const updateComment = [
 const deleteComment = [
   passport.authenticate("jwt", { session: false }),
   async (req: Request, res: Response) => {
-    const { commentId } = req.query;
     try {
       const user = await prisma.user.findFirst({
         where: {
-          id: req.user?.id,
+          id: req.user.id,
         },
       });
-      const comment = await prisma.comment.findFirst({
-        where: {
-          id: commentId,
-        },
-      });
-      if (user && comment && user.id == comment.userId) {
-        await prisma.vote.deleteMany({
+      if (user) {
+        const postComment = await prisma.comment.update({
           where: {
-            commentId,
+            id: Number(req.query.commentId),
+          },
+          data: {
+            text: "Comment has been deleted.",
+            edited: new Date().toISOString(),
           },
         });
-        const deleted = await prisma.comment.delete({
-          where: {
-            id: commentId,
-          },
-        });
-        res.status(200).json({
-          message: "Comment Deleted",
-          deleted,
-        });
+        res.json(postComment);
+      } else {
+        throw new Error("Could not connect this user to the specified comment");
       }
     } catch (e) {
       console.log(e);
@@ -575,6 +771,48 @@ const acceptFollowRequest = [
   },
 ];
 
+const unfollowUser = [
+  passport.authenticate("jwt", { session: false }),
+  async (req: Request, res: Response) => {
+    const { otherUserId } = req.body;
+    try {
+      const otherUser = await prisma.user.findFirst({
+        where: { id: otherUserId },
+      });
+      const user = await prisma.user.findFirst({
+        where: { id: req.user.id },
+        include: {
+          following: true,
+        },
+      });
+
+      const foundFollower = user?.following.find((u) => u.id == otherUser.id);
+      if (otherUser && foundFollower) {
+        const removedUserArray = user.following.filter(
+          (user) => user.id != otherUser.id,
+        );
+
+        console.log(removedUserArray);
+
+        const updatedFollowing = await prisma.user.update({
+          where: {
+            id: req.user.id,
+          },
+          data: {
+            following: { set: [...removedUserArray] },
+          },
+        });
+        res.status(200).json({ message: "Unfollowed User", updatedFollowing });
+      } else {
+        throw new Error("Other User is not following the User");
+      }
+    } catch (e) {
+      console.log(e);
+      res.status(400).json(e);
+    }
+  },
+];
+
 const updateUser = [
   passport.authenticate("jwt", { session: false }),
   async (req: Request, res: Response) => {
@@ -604,14 +842,18 @@ export {
   subredditPost,
   subComment,
   deleteComment,
+  deletePost,
   updateComment,
+  updatePost,
   postVote,
   commentVote,
+  deleteVote,
   createFollowRequest,
   acceptFollowRequest,
   rejectFollowRequest,
   getFollowingPosts,
   updateUser,
+  unfollowUser,
   getPosts,
   getComments,
   getUsers,

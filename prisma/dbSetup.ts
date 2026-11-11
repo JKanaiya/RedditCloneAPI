@@ -155,7 +155,6 @@ async function main() {
   }
 
   const commentlessPosts = await prisma.post.findMany({});
-  console.log(commentlessPosts);
 
   for (let i = 0; i < 7; i++) {
     const comment = await prisma.comment.upsert({

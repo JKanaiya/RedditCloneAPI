@@ -21,6 +21,10 @@ import {
   updateComment,
   deleteComment,
   getComments,
+  deleteVote,
+  updatePost,
+  deletePost,
+  unfollowUser,
 } from "../controllers/indexController.js";
 
 const indexRouter = express.Router();
@@ -51,6 +55,10 @@ indexRouter.post("/vote-comment", commentVote);
 indexRouter.post("/follow-request", createFollowRequest);
 indexRouter.patch("/user", updateUser);
 indexRouter.patch("/comment", updateComment);
+indexRouter.patch("/post", updatePost);
+indexRouter.patch("/following", unfollowUser);
 indexRouter.delete("/comment", deleteComment);
+indexRouter.delete("/post", deletePost);
+indexRouter.delete("/vote", deleteVote);
 
 export default indexRouter;
