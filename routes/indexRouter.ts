@@ -25,6 +25,7 @@ import {
   updatePost,
   deletePost,
   unfollowUser,
+  setProfileImg,
 } from "../controllers/indexController.js";
 
 const indexRouter = express.Router();
@@ -52,6 +53,7 @@ indexRouter.post("/sub-comment", subComment);
 indexRouter.post("/log-in", logIn);
 indexRouter.post("/vote-post", postVote);
 indexRouter.post("/vote-comment", commentVote);
+indexRouter.post("/profile-image", setProfileImg);
 indexRouter.post("/follow-request", createFollowRequest);
 indexRouter.patch("/user", updateUser);
 indexRouter.patch("/comment", updateComment);

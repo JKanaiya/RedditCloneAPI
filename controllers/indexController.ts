@@ -225,7 +225,7 @@ const subredditPost = [
   passport.authenticate("jwt", { session: false }),
   async (req: Request, res: Response) => {
     const now = new Date();
-    const { title, text, subName } = req.body;
+    const { title, text, subName, imageUrl } = req.body;
     try {
       const subreddit = await prisma.subReddit.findFirst({
         where: {
@@ -239,6 +239,7 @@ const subredditPost = [
             text,
             userId: req.user.id,
             created: now.toISOString(),
+            postImageUrl: imageUrl,
             subRedditId: subreddit.id,
           },
         });
@@ -441,7 +442,7 @@ const updatePost = [
   passport.authenticate("jwt", { session: false }),
   async (req: Request, res: Response) => {
     const now = new Date();
-    const { postId, text, title } = req.body;
+    const { postId, text, title, imageUrl } = req.body;
     console.log(text);
     try {
       const user = await prisma.user.findFirst({
@@ -467,6 +468,7 @@ const updatePost = [
             text: text,
             title: title,
             edited: diff > 3 ? now.toISOString() : null,
+            postImageUrl: imageUrl,
           },
         });
         res.status(200).json({
@@ -641,31 +643,41 @@ const createFollowRequest = [
         },
       });
       if (receiver) {
-        const followRequest = await prisma.followRequest.create({
-          data: {
+        const frExists = await prisma.followRequest.findFirst({
+          where: {
             receiverId: receiver.id,
             senderId: req.user.id,
           },
         });
-        const requestSent = await prisma.user.update({
-          where: {
-            id: receiver.id,
-          },
-          data: {
-            followRequests: {
-              set: [...receiver.followRequests, followRequest],
+        if (!frExists) {
+          const followRequest = await prisma.followRequest.create({
+            data: {
+              receiverId: receiver.id,
+              senderId: req.user.id,
             },
-          },
-          include: {
-            followRequests: true,
-          },
-        });
-        res.status(200).json({
-          message: "Follow Request Sent",
-          requestSent,
-        });
+          });
+          const requestSent = await prisma.user.update({
+            where: {
+              id: receiver.id,
+            },
+            data: {
+              followRequests: {
+                set: [...receiver.followRequests, followRequest],
+              },
+            },
+            include: {
+              followRequests: true,
+            },
+          });
+          res.status(200).json({
+            message: "Follow Request Sent",
+            requestSent,
+          });
+        } else {
+          throw new Error("Follow request already exists");
+        }
       } else {
-        throw new Error();
+        throw new Error("Incorrect receiver id sent");
       }
     } catch (e) {
       console.log(e);
@@ -792,8 +804,6 @@ const unfollowUser = [
           (user) => user.id != otherUser.id,
         );
 
-        console.log(removedUserArray);
-
         const updatedFollowing = await prisma.user.update({
           where: {
             id: req.user.id,
@@ -834,6 +844,25 @@ const updateUser = [
   },
 ];
 
+const setProfileImg = [
+  passport.authenticate("jwt", { session: false }),
+  async (req: Request, res: Response) => {
+    try {
+      const profileUpdated = await prisma.user.update({
+        where: {
+          id: req.user?.id,
+        },
+        data: {
+          profileImageUrl: req.body.piUrl,
+        },
+      });
+      res.status(200).json(profileUpdated);
+    } catch (e) {
+      res.status(400).json(e);
+    }
+  },
+];
+
 export {
   createSubreddit,
   subscribe,
@@ -845,6 +874,7 @@ export {
   deletePost,
   updateComment,
   updatePost,
+  setProfileImg,
   postVote,
   commentVote,
   deleteVote,
