@@ -158,68 +158,60 @@ const subscribe = [
   },
 ];
 
-const comment = [
-  passport.authenticate("jwt", { session: false }),
-  async (req: Request, res: Response) => {
-    const { text, postId } = req.body;
-    const now = new Date();
-    try {
-      const post = await prisma.post.findFirst({
-        where: {
-          id: postId,
+const comment = async (postId: number, text: string, user) => {
+  const now = new Date();
+  try {
+    const post = await prisma.post.findFirst({
+      where: {
+        id: postId,
+      },
+    });
+    if (post) {
+      const comment = await prisma.comment.create({
+        data: {
+          postId: post.id,
+          text,
+          userId: user.id,
+          created: now.toISOString(),
         },
       });
-      if (post) {
-        const comment = await prisma.comment.create({
-          data: {
-            postId: post.id,
-            text,
-            userId: req.user.id,
-            created: now.toISOString(),
-          },
-        });
-        res.status(200).json({ message: "Commented on Post", comment });
-      } else {
-        throw new Error();
-      }
-    } catch (e) {
-      console.log(e);
-      res.status(400).json(e);
+      return { message: "Commented on Post", comment };
+    } else {
+      throw new Error();
     }
-  },
-];
+  } catch (e) {
+    console.log(e);
+    return "Error: " + e;
+  }
+};
 
-const subComment = [
-  passport.authenticate("jwt", { session: false }),
-  async (req: Request, res: Response) => {
-    const { text, commentId } = req.body;
-    const now = new Date();
-    try {
-      const comment = await prisma.comment.findFirst({
-        where: {
-          id: commentId,
+const subComment = async (commentId: number, text: string, user) => {
+  const now = new Date();
+  try {
+    const comment = await prisma.comment.findFirst({
+      where: {
+        id: commentId,
+      },
+    });
+    if (comment) {
+      const subComment = await prisma.comment.create({
+        data: {
+          parentCommentId: comment.id,
+          text,
+          userId: user.id,
+          postId: comment.postId,
+          created: now.toISOString(),
         },
       });
-      if (comment) {
-        const subComment = await prisma.comment.create({
-          data: {
-            parentCommentId: comment.id,
-            text,
-            userId: req.user.id,
-            postId: comment.postId,
-            created: now.toISOString(),
-          },
-        });
-        res.status(200).json({ message: "Commented on Comment", subComment });
-      } else {
-        throw new Error();
-      }
-    } catch (e) {
-      console.log(e);
-      res.status(400).json(e);
+      return { message: "Commented on Comment", subComment };
+    } else {
+      throw new Error();
     }
-  },
-];
+  } catch (e) {
+    console.log(e);
+    return "Error: " + e;
+  }
+};
 
 const subredditPost = [
   passport.authenticate("jwt", { session: false }),
@@ -483,47 +475,38 @@ const updatePost = [
   },
 ];
 
-const updateComment = [
-  passport.authenticate("jwt", { session: false }),
-  async (req: Request, res: Response) => {
-    const now = new Date();
-    const { commentId, text } = req.body;
-    try {
-      const user = await prisma.user.findFirst({
-        where: {
-          id: req.user?.id,
-        },
-      });
-      const comment = await prisma.comment.findFirst({
+const updateComment = async (commentId: number, text: string, user) => {
+  const now = new Date();
+  try {
+    const comment = await prisma.comment.findFirst({
+      where: {
+        id: commentId,
+      },
+    });
+
+    if (user && comment && user.id == comment.userId) {
+      const oldDate = new Date(comment?.created);
+      const diff = Math.abs(now - oldDate) / 60 / 1000;
+      // edits done within 3 minutes of creation do not result in an "edited" value
+      const updated = await prisma.comment.update({
         where: {
           id: commentId,
         },
+        data: {
+          text: text,
+          edited: diff > 3 ? now.toISOString() : null,
+        },
       });
-
-      if (user && comment && user.id == comment.userId) {
-        const oldDate = new Date(comment?.created);
-        const diff = Math.abs(now - oldDate) / 60 / 1000;
-        // edits done within 3 minutes of creation do not result in an "edited" value
-        const updated = await prisma.comment.update({
-          where: {
-            id: commentId,
-          },
-          data: {
-            text: text,
-            edited: diff > 3 ? now.toISOString() : null,
-          },
-        });
-        res.status(200).json({
-          message: "Comment Updated",
-          updated,
-        });
-      }
-    } catch (e) {
-      console.log(e);
-      res.status(400).json(e);
+      return {
+        message: "Comment Updated",
+        updated,
+      };
     }
-  },
-];
+  } catch (e) {
+    console.log(e);
+    return "Error: " + e;
+  }
+};
 
 // NOTE: this would be the functionality to delete a comment,
 // but there is a value in the user's deleted comment leaving a space for the
