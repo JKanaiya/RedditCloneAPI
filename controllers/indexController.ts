@@ -27,7 +27,14 @@ const getUsers = [
         include: {
           followers: true,
           following: true,
-          posts: { include: { votes: true } },
+          posts: {
+            include: {
+              votes: true,
+              user: true,
+              subReddit: true,
+              comments: true,
+            },
+          },
           followRequests: { include: { receiver: true, sender: true } },
           sentFollowRequests: { include: { receiver: true, sender: true } },
         },
@@ -48,6 +55,7 @@ const getPosts = [
           votes: true,
           comments: { include: { subComments: true } },
           user: true,
+          subReddit: true,
         },
       });
       res.status(200).json(posts);
@@ -93,6 +101,7 @@ const getComments = [
           },
           user: true,
           votes: true,
+          subReddit: true,
         },
       });
       res.status(200).json(post?.comments);
