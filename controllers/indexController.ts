@@ -38,6 +38,9 @@ const getUsers = [
           followRequests: { include: { receiver: true, sender: true } },
           sentFollowRequests: { include: { receiver: true, sender: true } },
         },
+        omit: {
+          password: true,
+        },
       });
       res.status(200).json(users);
     } catch (e) {
