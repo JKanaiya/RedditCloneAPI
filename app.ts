@@ -58,7 +58,6 @@ io.on("connection", (socket) => {
     try {
       await updateComment(comment.commentId, comment.text, socket.request.user);
       io.emit("updated-comments");
-      console.log("did it fire");
     } catch (e) {
       console.log("Error" + e);
     }

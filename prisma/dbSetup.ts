@@ -101,7 +101,7 @@ async function main() {
     },
     update: {},
     create: {
-      name: "0thSubreddit",
+      name: "random",
     },
   });
 
@@ -111,7 +111,7 @@ async function main() {
     },
     update: {},
     create: {
-      name: "nthSubreddit",
+      name: "miscellaneous",
     },
   });
 
@@ -127,7 +127,7 @@ async function main() {
     },
   });
 
-  const prismaUsers = await prisma.user.findmany({});
+  const prismaUsers = await prisma.user.findMany({});
 
   for (let i = 0; i < 7; i++) {
     const post = await prisma.post.upsert({
